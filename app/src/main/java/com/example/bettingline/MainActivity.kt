@@ -23,16 +23,99 @@ import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
+import androidx.compose.foundation.background
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.ui.unit.DpOffset
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
-            RaceScreen()
+            // Use the LandingPage as the root composable.
+            LandingPage()
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LandingPage() {
+    val scope = rememberCoroutineScope()
+    var currentScreen by remember { mutableStateOf("landing") }
+    var expanded by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Betting App", color = Color.White) },
+                navigationIcon = {
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Menu",
+                            tint = Color(0xFFFFA500)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Black)
+            )
+        },
+        containerColor = Color.Black,
+        content = { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                when (currentScreen) {
+                    "landing" -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Welcome to the Betting App",
+                                color = Color(0xFFFFA500),
+                                style = MaterialTheme.typography.headlineMedium
+                            )
+                        }
+                    }
+                    "race" -> {
+                        RaceScreen()
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    offset = DpOffset(0.dp, 56.dp),
+                    modifier = Modifier
+                        .background(Color.DarkGray)
+                        .align(Alignment.TopStart)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Home", color = Color.White) },
+                        onClick = {
+                            currentScreen = "landing"
+                            expanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Race Horses", color = Color.White) },
+                        onClick = {
+                            currentScreen = "race"
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    )
+}
+
+
 
 @Composable
 fun RaceScreen() {
@@ -50,7 +133,9 @@ fun RaceScreen() {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Race Track
@@ -63,17 +148,27 @@ fun RaceScreen() {
             )
         }
 
-        // Winner Text
+        // Winner Text in white
         winner?.let {
-            Text(text = "🏆 Winner: $it!", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                text = "🏆 Winner: $it!",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White
+            )
         }
 
-        // Event Log
+        // Event Log with white text
         Column(
-            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
         ) {
             eventLog.takeLast(5).forEach { event ->
-                Text(text = event, modifier = Modifier.padding(4.dp))
+                Text(
+                    text = event,
+                    modifier = Modifier.padding(4.dp),
+                    color = Color.White
+                )
             }
         }
 
@@ -85,9 +180,13 @@ fun RaceScreen() {
                 eventLog = emptyList()
                 horses.forEach { it.progress.value = 0f }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
         ) {
-            Text(if (raceInProgress) "Restart Race" else "Start Race")
+            Text(
+                text = if (raceInProgress) "Restart Race" else "Start Race",
+                color = Color.White
+            )
         }
     }
 }
@@ -115,7 +214,6 @@ fun HorseRaceScreen(
             val y = centerY + trackRadius * sin(radian).toFloat()
 
             drawCircle(color = horse.color, radius = 20f, center = Offset(x, y))
-            //showIcon(horse, x, y)
         }
     }
 
@@ -145,7 +243,7 @@ fun HorseRaceScreen(
 
                 horse.progress.value = newProgress
 
-                // Random Events that will impede the horses by their luck
+                // Random events that impede the horses based on luck
                 if (Random.nextFloat() < 0.02f) {
                     val event = listOf("wind", "track condition", "collision").random()
                     val affected = Random.nextFloat() > horse.luck
@@ -172,13 +270,13 @@ fun HorseRaceScreen(
         }
     }
 }
-// horse will have stats to determine the winner
+
 data class Horse(
     val name: String,
     val speed: Float,
     val stamina: Float,
     val luck: Float,  // 0.0 (unlucky) to 1.0 (very lucky)
     val experience: Float,
-    val progress: MutableState<Float> = mutableFloatStateOf(0f), // Mutable state
+    val progress: MutableState<Float> = mutableFloatStateOf(0f),
     val color: Color = Color(Random.nextFloat(), Random.nextFloat(), Random.nextFloat())
 )
