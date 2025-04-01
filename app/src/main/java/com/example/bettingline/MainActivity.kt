@@ -1,42 +1,28 @@
 package com.example.bettingline
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
-import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.random.Random
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.filled.FilterList
+
+
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,6 +34,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Preview
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LandingPage() {
@@ -80,17 +67,10 @@ fun LandingPage() {
             ) {
                 when (currentScreen) {
                     "landing" -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Welcome to the Betting App",
-                                color = Color(0xFFFFA500),
-                                style = MaterialTheme.typography.headlineMedium
-                            )
-                        }
+                        // Landing screen content
+                        LandingScreen()
                     }
+
                     "race" -> {
                         RaceScreen()
                     }
@@ -125,195 +105,108 @@ fun LandingPage() {
 }
 
 
-
 @Composable
-fun RaceScreen() {
-    var raceInProgress by remember { mutableStateOf(false) }
-    var winner by remember { mutableStateOf<String?>(null) }
-    var eventLog by remember { mutableStateOf(listOf<String>()) }
-    val context = LocalContext.current
+fun LandingScreen() {
+    val sports = listOf(
+        "Custom" to "🎮",
+        "MMA" to "🥊",
+        "Basketball" to "🏀",
+        "Football" to "🏈",
+        "Soccer" to "⚽️",
+        "Baseball" to "⚾️",
+        "Hockey" to "🏒",
+        "Tennis" to "🎾",
+        "Golf" to "⛳️"
+    )
 
-    val horses = remember {
-        mutableStateListOf(
-            Horse("Thunder", 1.2f, 0.8f, 0.7f, 0.9f),
-            Horse("Blaze", 1.1f, 0.9f, 0.5f, 0.8f),
-            Horse("Storm", 1.3f, 0.7f, 0.6f, 1.0f),
-            Horse("Shadow", 1.0f, 1.0f, 0.9f, 0.6f)
-        )
-    }
+    var selectedSport by remember { mutableStateOf("Custom") }
+    var searchQuery by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black)
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.Start
     ) {
-        // Race Track
-        Box(modifier = Modifier.weight(1f)) {
-            HorseRaceScreen(
-                horses = horses,
-                raceInProgress = raceInProgress,
-                onRaceEnd = { winner = it },
-                onEvent = { event -> eventLog = eventLog + event }
-            )
-        }
+        // Heading
+        Text(
+            text = "Create New Game",
+            color = Color.White,
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
-        // Winner Text in white
-        winner?.let {
-            Text(
-                text = "🏆 Winner: $it!",
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color.White
-            )
-        }
-
-        // Event Log with white text
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-        ) {
-            eventLog.takeLast(5).forEach { event ->
-                Text(
-                    text = event,
-                    modifier = Modifier.padding(4.dp),
-                    color = Color.White
-                )
-            }
-        }
-        // show list of horses and their corresponding color and name
+        // Scrollable sports selector
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .horizontalScroll(rememberScrollState())
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            horses.forEach { horse ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(
-                        painter = painterResource(id = R.drawable.horse), // Replace with your horse.png
-                        contentDescription = horse.name,
-                        modifier = Modifier
-                            .size(50.dp)
-                            .background(horse.color),// Use horse's color as background
-                        colorFilter = ColorFilter.tint(horse.color, BlendMode.Multiply) // Apply tint only to black areas
-                    )
+            sports.forEach { (sport, icon) ->
+                val isSelected = selectedSport == sport
+                Button(
+                    onClick = { selectedSport = sport },
+                    shape = MaterialTheme.shapes.large,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    border = if (isSelected) BorderStroke(2.dp, Color(0xFFFFA500)) else null,
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 80.dp)
+                        .height(40.dp)
+                ) {
                     Text(
-                        text = horse.name,
-                        color = horse.color, // Text color matches the horse's color
-                        style = MaterialTheme.typography.bodyLarge
+                        text = "$icon $sport",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1
                     )
                 }
             }
         }
 
-        // Start/Restart Button
-        Button(
-            onClick = {
-                raceInProgress = !raceInProgress
-                winner = null
-                eventLog = emptyList()
-                horses.forEach { it.progress.value = 0f }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
+        // Search bar with filter icon
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.DarkGray, shape = MaterialTheme.shapes.small)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = if (raceInProgress) "Restart Race" else "Start Race",
-                color = Color.White
+            BasicTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                decorationBox = { innerTextField ->
+                    if (searchQuery.isEmpty()) {
+                        Text("Find Created Games", color = Color.LightGray)
+                    }
+                    innerTextField()
+                }
             )
-        }
-    }
-}
 
-@Composable
-fun HorseRaceScreen(
-    horses: List<Horse>,
-    raceInProgress: Boolean,
-    onRaceEnd: (String) -> Unit,
-    onEvent: (String) -> Unit
-) {
-    val raceState = remember { horses.map { it.copy(progress = mutableFloatStateOf(0f)) } }
-    val raceFinished = remember { mutableStateOf(false) }
-    val animatables = remember { raceState.map { Animatable(0f) } }
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val centerX = size.width / 2
-        val centerY = size.height / 2
-        val xRadius = size.width / 3
-        val yRadius = size.height / 4
-        //val trackRadius = size.minDimension / 3
-        drawOval(color = Color.Gray, topLeft = Offset(centerX - xRadius, centerY - yRadius), size = androidx.compose.ui.geometry.Size(xRadius * 2, yRadius * 2))
-        raceState.forEachIndexed { index, horse ->
-            val animatedProgress = animatables[index].value
-            val angle = animatedProgress * 360f
-            val radian = Math.toRadians(angle.toDouble())
-            val x = centerX + xRadius * cos(radian).toFloat()
-            val y = centerY + yRadius * sin(radian).toFloat()
-
-            drawCircle(color = horse.color, radius = 20f, center = Offset(x, y))
-        }
-    }
-
-    LaunchedEffect(raceInProgress) {
-        if (!raceInProgress) return@LaunchedEffect
-
-        while (raceState.any { it.progress.value < 1.0f } && !raceFinished.value) {
-            raceState.forEachIndexed { index, horse ->
-                if (horse.progress.value >= 1.0f) {
-                    if (!raceFinished.value) {
-                        raceFinished.value = true
-                        onRaceEnd(horse.name)
-                    }
-                    return@forEachIndexed
-                }
-
-                val speedFactor = horse.speed * 0.001f
-                val newProgress = (horse.progress.value + speedFactor).coerceAtMost(1.0f)
-
-                // Smooth animation to new position
-                launch {
-                    animatables[index].animateTo(
-                        targetValue = newProgress,
-                        animationSpec = tween(durationMillis = 100, easing = { it })
-                    )
-                }
-
-                horse.progress.value = newProgress
-
-                // Random events that impede the horses based on luck
-                if (Random.nextFloat() < 0.02f) {
-                    val event = listOf("wind", "track condition", "collision").random()
-                    val affected = Random.nextFloat() > horse.luck
-
-                    if (affected) {
-                        when (event) {
-                            "wind" -> {
-                                horse.progress.value -= 0.02f
-                                onEvent("💨 Wind slowed ${horse.name}!")
-                            }
-                            "track condition" -> {
-                                horse.progress.value -= 0.015f
-                                onEvent("🌧️ Track condition affected ${horse.name}!")
-                            }
-                            "collision" -> {
-                                horse.progress.value -= 0.03f
-                                onEvent("🐎 Collision! ${horse.name} lost speed!")
-                            }
-                        }
-                    }
-                }
+            IconButton(onClick = { /* TODO */ }) {
+                Icon(
+                    imageVector = Icons.Filled.FilterList,
+                    contentDescription = "Filter",
+                    tint = Color.White
+                )
             }
-            delay(50L)
+
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "No bets created yet.",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodyLarge
+        )
     }
 }
-
-data class Horse(
-    val name: String,
-    val speed: Float,
-    val stamina: Float,
-    val luck: Float,  // 0.0 (unlucky) to 1.0 (very lucky)
-    val experience: Float,
-    val progress: MutableState<Float> = mutableFloatStateOf(0f),
-    val color: Color = Color(Random.nextFloat(), Random.nextFloat(), Random.nextFloat())
-)
