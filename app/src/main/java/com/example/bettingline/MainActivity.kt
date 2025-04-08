@@ -32,7 +32,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-
-
-
