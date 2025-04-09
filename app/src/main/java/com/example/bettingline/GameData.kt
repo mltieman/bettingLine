@@ -10,6 +10,7 @@ class GameData {
         val date: String,   // format: YYYY-MM-DD
         val time: String,   // format: HH:MM AM/PM
         val notes: String,
+        val lineValues: Map<String, Float> = emptyMap(),
         val bettingLines: List<String>
     )
 

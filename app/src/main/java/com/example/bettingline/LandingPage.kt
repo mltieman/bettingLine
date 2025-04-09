@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -36,10 +37,13 @@ fun LandingPage() {
     var currentScreen by remember { mutableStateOf("home") }
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    var selectedGame by remember { mutableStateOf<GameData.Game?>(null) }
+
 
 
     Scaffold(
         topBar = {
+            if (currentScreen != "viewGame") {
             TopAppBar(
                 title = { Text("Betting App", color = Color.White) },
                 navigationIcon = {
@@ -53,6 +57,7 @@ fun LandingPage() {
                 },
                 colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Black)
             )
+                }
         },
         containerColor = Color.Black,
         content = { innerPadding ->
@@ -71,26 +76,26 @@ fun LandingPage() {
                 }
 
                 when (currentScreen) {
-
                     "home" -> HomeScreen(
                         games = games,
                         onSportSelected = { sport ->
                             selectedSport = sport
                             currentScreen = "createGame"
                         },
-                        onDeleteGame = { gameToDelete ->
+                        onDeleteGame = { game ->
                             games.removeAll {
-                                it.title == gameToDelete.title &&
-                                        it.date == gameToDelete.date &&
-                                        it.time == gameToDelete.time
+                                it.title == game.title && it.date == game.date && it.time == game.time
                             }
-
                             scope.launch {
                                 GameStorage.saveGames(context, games)
                             }
+                        },
+                        onViewGame = { game ->
+                            selectedGame = game
+                            currentScreen = "viewGame"
                         }
-
                     )
+
                     "createGame" -> CreateGameScreen(
                         selectedSport = selectedSport,
                         onGameCreated = { newGame ->
@@ -102,10 +107,24 @@ fun LandingPage() {
                             currentScreen = "home"
                         }
                     )
-                    "race" -> {
-                        RaceScreen()
+
+                    "viewGame" -> selectedGame?.let { game ->
+                        ViewGameScreen(
+                            game = game,
+                            games = games,
+                            onBack = {
+                                currentScreen = "home"
+                                selectedGame = null
+                            },
+                            onEdit = {
+                                // TODO: Navigate to CreateGameScreen or EditGameScreen pre-filled
+                            }
+                        )
                     }
+
+                    "race" -> RaceScreen()
                 }
+
 
                 DropdownMenu(
                     expanded = expanded,

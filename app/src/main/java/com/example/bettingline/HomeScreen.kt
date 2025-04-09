@@ -2,6 +2,7 @@ package com.example.bettingline
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,7 +22,9 @@ import androidx.compose.ui.unit.dp
 fun HomeScreen(
     games: List<GameData.Game>,
     onSportSelected: (String) -> Unit,
-    onDeleteGame: (GameData.Game) -> Unit // ✅ add this
+    onDeleteGame: (GameData.Game) -> Unit,
+    onViewGame: (GameData.Game) -> Unit
+
 
 ) {
     val sports = listOf(
@@ -80,7 +83,8 @@ fun HomeScreen(
                 ) {
                     Text(
                         text = "$icon $sport",
-                        color = Color.White,
+                        color = Color(0xFFFFFFFF)
+                        ,
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1
                     )
@@ -94,6 +98,7 @@ fun HomeScreen(
                 .fillMaxWidth()
                 .background(Color.DarkGray, shape = MaterialTheme.shapes.small)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
+
             verticalAlignment = Alignment.CenterVertically
         ) {
             BasicTextField(
@@ -134,22 +139,26 @@ fun HomeScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(4.dp),
+
                         colors = CardDefaults.cardColors(containerColor = Color.DarkGray)
                     ) {
                         Box(modifier = Modifier.fillMaxWidth()) { // ✅ Must use Box here
-                            Column(
+                            Card(
                                 modifier = Modifier
-                                    .padding(12.dp)
-                                    .align(Alignment.CenterStart) // ✅ Aligns Column inside Box
-                            ) {
+                                    .fillMaxWidth()
+                                    .clickable { onViewGame(game) }
+                                    .padding(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.DarkGray) // ✅ use this instead
+                            )  {
                                 Text(
                                     text = game.title,
                                     color = Color(0xFFFFA500),
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    text = "🕒 ${game.date} at ${game.time}",
-                                    color = Color.White,
+                                    text = "Time: ${game.date} at ${game.time}",
+                                    color = Color(0xFFFFA500)
+                                    ,
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
@@ -184,5 +193,6 @@ fun HomeScreen(
         }
     }
 }
+
 
 

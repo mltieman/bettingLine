@@ -22,7 +22,8 @@ fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (GameData.
     var time by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     val bettingLines = remember { mutableStateListOf<String>() }
-    var newLine by remember { mutableStateOf("") }
+    var newLineName by remember { mutableStateOf("") }
+    var newLineValue by remember { mutableStateOf("") }
 
     val sports = listOf(
         "Custom" to "🎮",
@@ -111,45 +112,44 @@ fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (GameData.
 
         Divider(color = Color.Gray)
 
-        Text("Custom Betting Lines", color = Color.White)
+        Text("Add a New Betting Line", color = Color.White, style = MaterialTheme.typography.titleMedium)
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = newLine,
-                onValueChange = { newLine = it },
-                label = { Text("Add Line") },
+                value = newLineName,
+                onValueChange = { newLineName = it },
+                label = { Text("Line Name") },
                 modifier = Modifier.weight(1f),
-                colors = fieldColors
+                colors = fieldColors,
+                singleLine = true
+
             )
-            Spacer(modifier = Modifier.width(8.dp))
+
+            OutlinedTextField(
+                value = newLineValue,
+                onValueChange = { newLineValue = it },
+                label = { Text("Value") },
+                modifier = Modifier.width(100.dp),
+                colors = fieldColors,
+                singleLine = true
+            )
+
             Button(
                 onClick = {
-                    if (newLine.isNotBlank()) {
-                        bettingLines.add(newLine)
-                        newLine = ""
+                    val value = newLineValue.toFloatOrNull()
+                    if (newLineName.isNotBlank() && value != null) {
+                        bettingLines.add("${newLineName.trim()}: ${"%.2f".format(value)}")
+                        newLineName = ""
+                        newLineValue = ""
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
             ) {
                 Text("Add", color = Color.White)
-            }
-
-        }
-
-        bettingLines.forEachIndexed { index, line ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF222222))
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = line, color = Color.White)
-                IconButton(onClick = { bettingLines.removeAt(index) }) {
-                    Icon(Icons.Filled.Close, contentDescription = "Remove", tint = Color.White)
-                }
             }
         }
 
