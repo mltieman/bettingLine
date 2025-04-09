@@ -1,29 +1,48 @@
 package com.example.bettingline
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.graphics.drawable.BitmapDrawable
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
-
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.BlendMode
 @Composable
 fun RaceScreen() {
     var raceInProgress by remember { mutableStateOf(false) }
     var winner by remember { mutableStateOf<String?>(null) }
     var eventLog by remember { mutableStateOf(listOf<String>()) }
+    val context = LocalContext.current
 
     val horses = remember {
         mutableStateListOf(
@@ -40,6 +59,7 @@ fun RaceScreen() {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Race Track
         Box(modifier = Modifier.weight(1f)) {
             HorseRaceScreen(
                 horses = horses,
@@ -49,6 +69,7 @@ fun RaceScreen() {
             )
         }
 
+        // Winner Text in white
         winner?.let {
             Text(
                 text = "🏆 Winner: $it!",
@@ -57,6 +78,7 @@ fun RaceScreen() {
             )
         }
 
+        // Event Log with white text
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -70,7 +92,33 @@ fun RaceScreen() {
                 )
             }
         }
+        // show list of horses and their corresponding color and name
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            horses.forEach { horse ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(
+                        painter = painterResource(id = R.drawable.horse), // Replace with your horse.png
+                        contentDescription = horse.name,
+                        modifier = Modifier
+                            .size(50.dp)
+                            .background(horse.color),// Use horse's color as background
+                        colorFilter = ColorFilter.tint(horse.color, BlendMode.Multiply) // Apply tint only to black areas
+                    )
+                    Text(
+                        text = horse.name,
+                        color = horse.color, // Text color matches the horse's color
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+        }
 
+        // Start/Restart Button
         Button(
             onClick = {
                 raceInProgress = !raceInProgress
@@ -78,9 +126,7 @@ fun RaceScreen() {
                 eventLog = emptyList()
                 horses.forEach { it.progress.value = 0f }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
         ) {
             Text(
@@ -101,19 +147,19 @@ fun HorseRaceScreen(
     val raceState = remember { horses.map { it.copy(progress = mutableFloatStateOf(0f)) } }
     val raceFinished = remember { mutableStateOf(false) }
     val animatables = remember { raceState.map { Animatable(0f) } }
-
     Canvas(modifier = Modifier.fillMaxSize()) {
         val centerX = size.width / 2
         val centerY = size.height / 2
-        val trackRadius = size.minDimension / 3
-
-        drawCircle(color = Color.Gray, center = Offset(centerX, centerY), radius = trackRadius)
-
+        val xRadius = size.width / 3
+        val yRadius = size.height / 4
+        //val trackRadius = size.minDimension / 3
+        drawOval(color = Color.Gray, topLeft = Offset(centerX - xRadius, centerY - yRadius), size = androidx.compose.ui.geometry.Size(xRadius * 2, yRadius * 2))
         raceState.forEachIndexed { index, horse ->
-            val angle = animatables[index].value * 360f
+            val animatedProgress = animatables[index].value
+            val angle = animatedProgress * 360f
             val radian = Math.toRadians(angle.toDouble())
-            val x = centerX + trackRadius * cos(radian).toFloat()
-            val y = centerY + trackRadius * sin(radian).toFloat()
+            val x = centerX + xRadius * cos(radian).toFloat()
+            val y = centerY + yRadius * sin(radian).toFloat()
 
             drawCircle(color = horse.color, radius = 20f, center = Offset(x, y))
         }
@@ -135,15 +181,17 @@ fun HorseRaceScreen(
                 val speedFactor = horse.speed * 0.001f
                 val newProgress = (horse.progress.value + speedFactor).coerceAtMost(1.0f)
 
+                // Smooth animation to new position
                 launch {
                     animatables[index].animateTo(
                         targetValue = newProgress,
-                        animationSpec = tween(durationMillis = 100)
+                        animationSpec = tween(durationMillis = 100, easing = { it })
                     )
                 }
 
                 horse.progress.value = newProgress
 
+                // Random events that impede the horses based on luck
                 if (Random.nextFloat() < 0.02f) {
                     val event = listOf("wind", "track condition", "collision").random()
                     val affected = Random.nextFloat() > horse.luck
