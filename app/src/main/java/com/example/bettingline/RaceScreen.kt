@@ -1,6 +1,6 @@
 package com.example.bettingline
 
-import DatabaseHelper
+import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -38,37 +38,59 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.BlendMode
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.room.Room
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.cos
+import kotlin.math.sin
+
 @Composable
 fun RaceScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val horses = remember { mutableStateListOf<HorseWithState>() }
     var raceInProgress by remember { mutableStateOf(false) }
     var winner by remember { mutableStateOf<String?>(null) }
     var eventLog by remember { mutableStateOf(listOf<String>()) }
-    val context = LocalContext.current
-    val databaseHelper = DatabaseHelper(context)
 
-    // Fetch horses from the database
-    val horses = remember { mutableStateListOf<Horse>() }
+    val dao = remember {
+        HorseDatabase.getDatabase(context).horseDao()
+    }
 
-    // Fetch data and populate the database with default horses if it's empty
+    // Collect horses from the DB
     LaunchedEffect(Unit) {
-        val fetchedHorses = databaseHelper.horseDao.getAllHorses()
-
-        // If the database is empty, add default horses
-        if (fetchedHorses.isEmpty()) {
-            val defaultHorses = listOf(
-                HorseEntity(name = "Thunder", speed = 1.2f, stamina = 0.8f, luck = 0.7f, experience = 0.9f, colorHex = "#FF0000"),
-                HorseEntity(name = "Blaze", speed = 1.1f, stamina = 0.9f, luck = 0.5f, experience = 0.8f, colorHex = "#00FF00"),
-                HorseEntity(name = "Storm", speed = 1.3f, stamina = 0.7f, luck = 0.6f, experience = 1.0f, colorHex = "#0000FF"),
-                HorseEntity(name = "Shadow", speed = 1.0f, stamina = 1.0f, luck = 0.9f, experience = 0.6f, colorHex = "#FFFF00")
+        dao.getAllHorses().collect { dbHorses ->
+            horses.clear()
+            horses.addAll(
+                dbHorses.map {
+                    HorseWithState(
+                        id = it.id,
+                        name = it.name,
+                        speed = it.speed,
+                        stamina = it.stamina,
+                        luck = it.luck,
+                        experience = it.experience,
+                        colorHex = it.colorHex,
+                    )
+                }
             )
-
-            // Insert default horses into the database
-            defaultHorses.forEach { databaseHelper.horseDao.insert(it) }
-            // Add them to the in-memory list as Horses with progress = 0
-            horses.addAll(defaultHorses.map { Horse(it.id, it.name, it.speed, it.stamina, it.luck, it.experience, progress = 0f, colorHex = it.colorHex) })
-        } else {
-            // Convert the fetched HorseEntity into Horse (with progress)
-            horses.addAll(fetchedHorses.map { Horse(it.id, it.name, it.speed, it.stamina, it.luck, it.experience, progress = 0f, colorHex = it.colorHex) })
         }
     }
 
@@ -79,18 +101,21 @@ fun RaceScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Race Track
-        Box(modifier = Modifier.weight(1f)) {
-            key(raceInProgress) {
-                HorseRaceScreen(
-                    horses = horses,
-                    raceInProgress = raceInProgress,
-                    onRaceEnd = { winner = it },
-                    onEvent = { event -> eventLog = eventLog + event }
-                )
-            }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .aspectRatio(1.5f) // Optional: keeps canvas oval-shaped
+                .background(Color.DarkGray)
+        ) {
+            HorseRaceScreen(
+                horses = horses,
+                raceInProgress = raceInProgress,
+                onRaceEnd = { winner = it },
+                onEvent = { event -> eventLog = eventLog + event }
+            )
         }
 
-        // Winner Text in white
         winner?.let {
             Text(
                 text = "🏆 Winner: $it!",
@@ -99,7 +124,7 @@ fun RaceScreen() {
             )
         }
 
-        // Event Log with white text
+        // Event Log
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -114,7 +139,7 @@ fun RaceScreen() {
             }
         }
 
-        // show list of horses and their corresponding color and name
+        // Horse list display with delete button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -124,50 +149,107 @@ fun RaceScreen() {
             horses.forEach { horse ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Image(
-                        painter = painterResource(id = R.drawable.horse), // Replace with your horse.png
+                        painter = painterResource(id = R.drawable.horse),
                         contentDescription = horse.name,
                         modifier = Modifier
                             .size(50.dp)
                             .background(horse.color),
+                        colorFilter = ColorFilter.tint(horse.color, BlendMode.Multiply)
                     )
                     Text(
                         text = horse.name,
-                        color = horse.color, // Text color matches the horse's color
+                        color = horse.color,
                         style = MaterialTheme.typography.bodyLarge
                     )
+
+                    // Delete button
+//                    IconButton(
+//                        onClick = {
+//                            scope.launch {
+//                                dao.deleteHorse(horse.horse) // Assuming deleteHorse is defined in your DAO
+//                                horses.remove(horse) // Remove from the UI list
+//                            }
+//                        }
+//                    ) {
+//                        Icon(
+//                            imageVector = Icons.Default.Archive,
+//                            contentDescription = "Delete Horse",
+//                            tint = Color.Red
+//                        )
+//                    }
                 }
             }
         }
 
-        // Start/Restart Button
-        Button(
-            onClick = {
-                raceInProgress = !raceInProgress
-                winner = null
-                eventLog = emptyList()
-                horses.forEach { it.progress = 0f }  // Reset progress when restarting the race
-            },
+        // Buttons
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = if (raceInProgress) "Restart Race" else "Start Race",
-                color = Color.White
-            )
+            Button(
+                onClick = {
+                    scope.launch {
+                        // Always stop race first
+                        raceInProgress = false
+                        delay(100) // Let the UI reset
+
+                        // Reset game state
+                        winner = null
+                        eventLog = emptyList()
+                        horses.forEach { it.progress.floatValue = 0f }
+
+                        // Then start race again
+                        raceInProgress = true
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
+            ) {
+                Text("Start Race", color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Button(
+                onClick = {
+                    scope.launch {
+                        val newHorse = generateRandomHorse()
+                        dao.insertHorse(newHorse)
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF32CD32))
+            ) {
+                Text("Add Horse", color = Color.White)
+            }
         }
     }
 }
 
+
+fun generateRandomHorse(): Horse {
+    val colors = listOf("#FF0000", "#00FF00", "#0000FF", "#FFA500", "#800080")
+    val names = listOf("Thunder", "Blaze", "Storm", "Shadow", "Lightning", "Dusty", "Rocket")
+
+    return Horse(
+        name = names.random(),
+        speed = Random.nextFloat() * 0.5f + 1.0f,
+        stamina = Random.nextFloat(),
+        luck = Random.nextFloat(),
+        experience = Random.nextFloat(),
+        colorHex = colors.random()
+    )
+}
+
 @Composable
 fun HorseRaceScreen(
-    horses: List<Horse>,  // Use the list of Horse objects that includes progress
+    horses: List<HorseWithState>,
     raceInProgress: Boolean,
     onRaceEnd: (String) -> Unit,
     onEvent: (String) -> Unit
 ) {
-    val raceState = remember { horses.map { it.copy(progress = 0f) } }  // Reset the race state each time
     val raceFinished = remember { mutableStateOf(false) }
-    val animatables = remember { raceState.map { Animatable(0f) } }  // Animation for smooth movement
+    val animatables = remember(horses.size) { horses.map { Animatable(0f) }.toMutableList() }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val centerX = size.width / 2
@@ -175,12 +257,14 @@ fun HorseRaceScreen(
         val xRadius = size.width / 3
         val yRadius = size.height / 4
 
-        // Draw the race track as an oval
-        drawOval(color = Color.Gray, topLeft = Offset(centerX - xRadius, centerY - yRadius), size = androidx.compose.ui.geometry.Size(xRadius * 2, yRadius * 2))
+        drawOval(
+            color = Color.Gray,
+            topLeft = Offset(centerX - xRadius, centerY - yRadius),
+            size = Size(xRadius * 2, yRadius * 2)
+        )
 
-        // Draw each horse in the race
-        raceState.forEachIndexed { index, horse ->
-            val animatedProgress = animatables[index].value
+        horses.forEachIndexed { index, horse ->
+            val animatedProgress = animatables.getOrNull(index)?.value ?: 0f
             val angle = animatedProgress * 360f
             val radian = Math.toRadians(angle.toDouble())
             val x = centerX + xRadius * cos(radian).toFloat()
@@ -193,9 +277,9 @@ fun HorseRaceScreen(
     LaunchedEffect(raceInProgress) {
         if (!raceInProgress) return@LaunchedEffect
 
-        while (raceState.any { it.progress < 1.0f } && !raceFinished.value) {
-            raceState.forEachIndexed { index, horse ->
-                if (horse.progress >= 1.0f) {
+        while (horses.any { it.progress.floatValue < 1f } && !raceFinished.value) {
+            horses.forEachIndexed { index, horse ->
+                if (horse.progress.floatValue >= 1.0f) {
                     if (!raceFinished.value) {
                         raceFinished.value = true
                         onRaceEnd(horse.name)
@@ -203,40 +287,29 @@ fun HorseRaceScreen(
                     return@forEachIndexed
                 }
 
-                // Calculate speed factor
                 val speedFactor = horse.speed * 0.001f
-                val newProgress = (horse.progress + speedFactor).coerceAtMost(1.0f)
+                val newProgress = (horse.progress.floatValue + speedFactor).coerceAtMost(1.0f)
+                horse.progress.floatValue = newProgress
 
-                // Animate the horse's progress on the track
                 launch {
                     animatables[index].animateTo(
-                        targetValue = newProgress,
-                        animationSpec = tween(durationMillis = 100, easing = { it })
+                        newProgress,
+                        animationSpec = tween(durationMillis = 100)
                     )
                 }
 
-                horse.progress = newProgress  // Update the horse's progress
-
-                // Random events affecting the horses based on their luck
+                // Events
                 if (Random.nextFloat() < 0.02f) {
                     val event = listOf("wind", "track condition", "collision").random()
                     val affected = Random.nextFloat() > horse.luck
-
                     if (affected) {
-                        when (event) {
-                            "wind" -> {
-                                horse.progress -= 0.02f
-                                onEvent("💨 Wind slowed ${horse.name}!")
-                            }
-                            "track condition" -> {
-                                horse.progress -= 0.015f
-                                onEvent("🌧️ Track condition affected ${horse.name}!")
-                            }
-                            "collision" -> {
-                                horse.progress -= 0.03f
-                                onEvent("🐎 Collision! ${horse.name} lost speed!")
-                            }
+                        val message = when (event) {
+                            "wind" -> "💨 Wind slowed ${horse.name}!"
+                            "track condition" -> "🌧️ Track affected ${horse.name}!"
+                            else -> "🐎 Collision! ${horse.name} lost speed!"
                         }
+                        horse.progress.floatValue -= 0.02f
+                        onEvent(message)
                     }
                 }
             }
