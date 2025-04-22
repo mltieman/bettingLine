@@ -49,9 +49,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.room.Room
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -105,8 +110,7 @@ fun RaceScreen() {
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .aspectRatio(1.5f) // Optional: keeps canvas oval-shaped
-                .background(Color.DarkGray)
+                .aspectRatio(1.5f) // Optional: keeps canvas oval-shape
         ) {
             HorseRaceScreen(
                 horses = horses,
@@ -153,30 +157,30 @@ fun RaceScreen() {
                         contentDescription = horse.name,
                         modifier = Modifier
                             .size(50.dp)
-                            .background(horse.color),
-                        colorFilter = ColorFilter.tint(horse.color, BlendMode.Multiply)
+                            .background(Color.White),
+                        colorFilter = ColorFilter.tint(horse.color)
                     )
                     Text(
                         text = horse.name,
                         color = horse.color,
                         style = MaterialTheme.typography.bodyLarge
                     )
-
-                    // Delete button
-//                    IconButton(
-//                        onClick = {
-//                            scope.launch {
-//                                dao.deleteHorse(horse.horse) // Assuming deleteHorse is defined in your DAO
-//                                horses.remove(horse) // Remove from the UI list
-//                            }
-//                        }
-//                    ) {
-//                        Icon(
-//                            imageVector = Icons.Default.Archive,
-//                            contentDescription = "Delete Horse",
-//                            tint = Color.Red
-//                        )
-//                    }
+                    if (!raceInProgress) {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    dao.deleteById(horse.id) // Use the ID from HorseWithState
+                                    horses.remove(horse) // Remove from UI list
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Archive,
+                                contentDescription = "Delete Horse",
+                                tint = Color.Red
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -205,22 +209,29 @@ fun RaceScreen() {
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
             ) {
-                Text("Start Race", color = Color.White)
+                if (raceInProgress ) {
+                    Text("Restart Race", color = Color.White)
+                } else {
+                    Text("Start Race", color = Color.White)
+
+                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            Button(
-                onClick = {
-                    scope.launch {
-                        val newHorse = generateRandomHorse()
-                        dao.insertHorse(newHorse)
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF32CD32))
-            ) {
-                Text("Add Horse", color = Color.White)
+            if (!raceInProgress) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            val newHorse = generateRandomHorse()
+                            dao.insertHorse(newHorse)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF32CD32))
+                ) {
+                    Text("Add Horse", color = Color.White)
+                }
             }
         }
     }
@@ -250,32 +261,74 @@ fun HorseRaceScreen(
 ) {
     val raceFinished = remember { mutableStateOf(false) }
     val animatables = remember(horses.size) { horses.map { Animatable(0f) }.toMutableList() }
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val centerX = size.width / 2
-        val centerY = size.height / 2
-        val xRadius = size.width / 3
-        val yRadius = size.height / 4
+    val screenWidthPx: Float
+    val screenHeightPx: Float
 
-        drawOval(
-            color = Color.Gray,
-            topLeft = Offset(centerX - xRadius, centerY - yRadius),
-            size = Size(xRadius * 2, yRadius * 2)
-        )
+    with(density) {
+        screenWidthPx = configuration.screenWidthDp.dp.toPx()
+        screenHeightPx = configuration.screenHeightDp.dp.toPx()
+    }
 
+    val centerX = screenWidthPx / 2f
+    val centerY = screenHeightPx / 2.5f
+    val xRadius = screenWidthPx / 3f
+    val yRadius = screenHeightPx / 4f
+
+    Box(modifier = Modifier.fillMaxSize()) {
+
+        // Draw the oval track
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawOval(
+                color = Color.DarkGray,
+                topLeft = Offset(centerX - xRadius, centerY - yRadius),
+                size = Size(xRadius * 2, yRadius * 2)
+            )
+            val trackPadding = 20.dp.toPx() // Adjust for thickness
+            drawOval(
+                color = Color.Green,
+                topLeft = Offset(centerX - xRadius + trackPadding, centerY - yRadius + trackPadding),
+                size = Size((xRadius - trackPadding) * 2, (yRadius - trackPadding) * 2)
+            )
+        }
+
+        // Draw each horse using Image and calculated position
         horses.forEachIndexed { index, horse ->
-            val animatedProgress = animatables.getOrNull(index)?.value ?: 0f
-            val angle = animatedProgress * 360f
-            val radian = Math.toRadians(angle.toDouble())
-            val x = centerX + xRadius * cos(radian).toFloat()
-            val y = centerY + yRadius * sin(radian).toFloat()
+            val progress = animatables[index].value
+            val angle = Math.toRadians((progress * 360f).toDouble())
 
-            drawCircle(color = horse.color, radius = 20f, center = Offset(x, y))
+            val x = centerX + xRadius * cos(angle).toFloat()
+            val y = centerY + yRadius * sin(angle).toFloat()
+
+            val horseSizePx = with(density) { 40.dp.toPx() }
+
+            Image(
+                painter = painterResource(id = R.drawable.horse),
+                contentDescription = horse.name,
+                modifier = Modifier
+                    .size(with(density) { horseSizePx.toDp() })
+                    .offset {
+                        IntOffset(
+                            (x - horseSizePx / 2).toInt(),
+                            (y - horseSizePx / 2).toInt()
+                        )
+                    }
+                    .graphicsLayer {
+                        rotationZ = (progress * 360f + 90f) % 360
+                        scaleX = -1f
+                    },
+                colorFilter = ColorFilter.tint(horse.color),
+            )
         }
     }
 
+
+    // Race logic stays the same
     LaunchedEffect(raceInProgress) {
         if (!raceInProgress) return@LaunchedEffect
+        raceFinished.value = false
 
         while (horses.any { it.progress.floatValue < 1f } && !raceFinished.value) {
             horses.forEachIndexed { index, horse ->
@@ -298,7 +351,6 @@ fun HorseRaceScreen(
                     )
                 }
 
-                // Events
                 if (Random.nextFloat() < 0.02f) {
                     val event = listOf("wind", "track condition", "collision").random()
                     val affected = Random.nextFloat() > horse.luck

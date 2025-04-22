@@ -13,4 +13,7 @@ interface HorseDao {
 
     @Query("SELECT * FROM horses")
     fun getAllHorses(): Flow<List<Horse>>
+
+    @Query("DELETE FROM horses WHERE id = :horseId")
+    suspend fun deleteById(horseId: Int)
 }
