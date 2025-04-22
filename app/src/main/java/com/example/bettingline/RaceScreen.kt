@@ -82,20 +82,20 @@ fun RaceScreen() {
     // Collect horses from the DB
     LaunchedEffect(Unit) {
         dao.getAllHorses().collect { dbHorses ->
+            // Ensure there are no more than 8 horses in the list
+            val horsesList = dbHorses.map {
+                HorseWithState(
+                    id = it.id,
+                    name = it.name,
+                    speed = it.speed,
+                    stamina = it.stamina,
+                    luck = it.luck,
+                    experience = it.experience,
+                    colorHex = it.colorHex,
+                )
+            }.shuffled().take(6) // Shuffle and take up to 8 horses
             horses.clear()
-            horses.addAll(
-                dbHorses.map {
-                    HorseWithState(
-                        id = it.id,
-                        name = it.name,
-                        speed = it.speed,
-                        stamina = it.stamina,
-                        luck = it.luck,
-                        experience = it.experience,
-                        colorHex = it.colorHex,
-                    )
-                }
-            )
+            horses.addAll(horsesList)
         }
     }
 
@@ -108,9 +108,10 @@ fun RaceScreen() {
         // Race Track
         Box(
             modifier = Modifier
-                .weight(1f)
                 .fillMaxWidth()
-                .aspectRatio(1.5f) // Optional: keeps canvas oval-shape
+                .weight(0.6f) // Adjust the weight for more vertical space
+                .offset(x = (-20).dp) // Shift the track slightly to the left
+                .align(Alignment.CenterHorizontally) // Center it horizontally
         ) {
             HorseRaceScreen(
                 horses = horses,
@@ -234,23 +235,90 @@ fun RaceScreen() {
                 }
             }
         }
+        if (!raceInProgress) {HorseListPopupButton(horses = horses)}
     }
 }
-
+fun randomHexColor(): String {
+    val randomColor = (0..0xFFFFFF).random() // Random number between 0 and 0xFFFFFF
+    return String.format("#%06X", randomColor) // Convert the number to a hex color string
+}
 
 fun generateRandomHorse(): Horse {
-    val colors = listOf("#FF0000", "#00FF00", "#0000FF", "#FFA500", "#800080")
-    val names = listOf("Thunder", "Blaze", "Storm", "Shadow", "Lightning", "Dusty", "Rocket")
-
+    val names = NameList.names
     return Horse(
         name = names.random(),
         speed = Random.nextFloat() * 0.5f + 1.0f,
         stamina = Random.nextFloat(),
         luck = Random.nextFloat(),
         experience = Random.nextFloat(),
-        colorHex = colors.random()
+        colorHex = randomHexColor()
     )
 }
+
+@Composable
+fun HorseListPopupButton(horses: List<HorseWithState>) {
+    var showHorseListDialog by remember { mutableStateOf(false) }
+
+    // Button to show the horse list dialog
+    Button(
+        onClick = { showHorseListDialog = true },
+        modifier = Modifier.padding(16.dp)
+    ) {
+        Text("Show Horse List")
+    }
+
+    // Horse list dialog
+    if (showHorseListDialog) {
+        HorseListDialog(
+            horses = horses,
+            onDismiss = { showHorseListDialog = false }
+        )
+    }
+}
+
+@Composable
+fun HorseListDialog(horses: List<HorseWithState>, onDismiss: () -> Unit) {
+    val speedWeight = 0.4f
+    val staminaWeight = 0.3f
+    val experienceWeight = 0.2f
+    val luckWeight = 0.1f
+
+    // Calculate total score for each horse
+    val horseScores = horses.map { horse ->
+        val totalScore = (horse.speed * speedWeight) +
+                (horse.stamina * staminaWeight) +
+                (horse.experience * experienceWeight) +
+                (horse.luck * luckWeight)
+        horse to totalScore
+    }
+    val totalScoreSum = horseScores.sumOf { it.second.toDouble()}  // Sum of totalScore for each horse
+    val horseProbabilities = horseScores.map { (horse, score) ->
+        horse to (score / totalScoreSum)  // Probability of winning
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Horse List with Winning Probabilities") },
+        text = {
+            Column {
+                horseProbabilities.forEach { (horse, probability) ->
+                    Text(
+                        text = "Name: ${horse.name}, Speed: ${horse.speed}, Stamina: ${horse.stamina}, Probability: ${(probability * 100).toInt()}%",
+                        modifier = Modifier.padding(4.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss
+            ) {
+                Text("Close")
+            }
+        }
+    )
+}
+
 
 @Composable
 fun HorseRaceScreen(
@@ -281,14 +349,15 @@ fun HorseRaceScreen(
 
         // Draw the oval track
         Canvas(modifier = Modifier.fillMaxSize()) {
+            val hexColor = Color(0xFFA52A2A)
             drawOval(
-                color = Color.DarkGray,
+                color = hexColor,
                 topLeft = Offset(centerX - xRadius, centerY - yRadius),
                 size = Size(xRadius * 2, yRadius * 2)
             )
             val trackPadding = 20.dp.toPx() // Adjust for thickness
             drawOval(
-                color = Color.Green,
+                color = Color(0xFF006400),
                 topLeft = Offset(centerX - xRadius + trackPadding, centerY - yRadius + trackPadding),
                 size = Size((xRadius - trackPadding) * 2, (yRadius - trackPadding) * 2)
             )
