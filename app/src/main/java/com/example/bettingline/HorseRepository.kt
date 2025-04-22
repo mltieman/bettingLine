@@ -12,4 +12,7 @@ class HorseRepository(private val horseDao: HorseDao) {
     suspend fun deleteHorse(horse: Horse) {
         horseDao.deleteHorse(horse)
     }
+    suspend fun deleteHorseById(id: Int) {
+        horseDao.deleteById(id)
+    }
 }

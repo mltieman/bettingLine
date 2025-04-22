@@ -26,6 +26,9 @@ class HorseViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteHorse(horse: Horse) = viewModelScope.launch {
         repo.deleteHorse(horse)
     }
+    fun deleteHorseById(id: Int) = viewModelScope.launch {
+        repo.deleteHorseById(id)
+    }
 }
 
 class HorseViewModelFactory(private val application: Application) :
