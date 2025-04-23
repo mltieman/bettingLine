@@ -7,15 +7,16 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -23,34 +24,31 @@ fun HomeScreen(
     games: List<GameData.Game>,
     onSportSelected: (String) -> Unit,
     onDeleteGame: (GameData.Game) -> Unit,
-    onViewGame: (GameData.Game) -> Unit
-
-
+    onViewGame: (GameData.Game) -> Unit,
+    onEdit: (GameData.Game) -> Unit
 ) {
     val sports = listOf(
-        "Custom" to "🎮",
-        "MMA" to "🥊",
-        "Basketball" to "🏀",
-        "Football" to "🏈",
-        "Soccer" to "⚽️",
-        "Baseball" to "⚾️",
-        "Hockey" to "🏒",
-        "Tennis" to "🎾",
-        "Golf" to "⛳️"
+        "Custom" to "🎮", "MMA" to "🥊", "Basketball" to "🏀", "Football" to "🏈",
+        "Soccer" to "⚽️", "Baseball" to "⚾️", "Hockey" to "🏒", "Tennis" to "🎾", "Golf" to "⛳️"
     )
 
     var selectedSport by remember { mutableStateOf("Custom") }
     var searchQuery by remember { mutableStateOf("") }
 
+    val filteredGames = games.filter {
+        it.title.contains(searchQuery, ignoreCase = true) ||
+                it.sport.contains(searchQuery, ignoreCase = true)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.Start
     ) {
-        // Heading
         Text(
             text = "Create New Game",
             color = Color.White,
@@ -58,7 +56,6 @@ fun HomeScreen(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Scrollable sports selector
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -83,8 +80,7 @@ fun HomeScreen(
                 ) {
                     Text(
                         text = "$icon $sport",
-                        color = Color(0xFFFFFFFF)
-                        ,
+                        color = Color.White,
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1
                     )
@@ -92,107 +88,86 @@ fun HomeScreen(
             }
         }
 
-        // Search bar with filter icon
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color.DarkGray, shape = MaterialTheme.shapes.small)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BasicTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-                decorationBox = { innerTextField ->
-                    if (searchQuery.isEmpty()) {
-                        Text("Find Created Games", color = Color.LightGray)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+            ) {
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(color = Color.White),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp, vertical = 12.dp),
+                    decorationBox = { innerTextField ->
+                        if (searchQuery.isEmpty()) {
+                            Text("Find Created Games", color = Color.LightGray)
+                        }
+                        innerTextField()
                     }
-                    innerTextField()
-                }
-            )
-
-            IconButton(onClick = { /* TODO */ }) {
-                Icon(
-                    imageVector = Icons.Filled.FilterList,
-                    contentDescription = "Filter",
-                    tint = Color.White
                 )
             }
+
+
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Game List or Empty Message
-        if (games.isEmpty()) {
-            Text(
-                text = "No bets created yet.",
-                color = Color.Gray,
-                style = MaterialTheme.typography.bodyLarge
-            )
+        if (filteredGames.isEmpty()) {
+            Text("No games found.", color = Color.Gray, style = MaterialTheme.typography.bodyLarge)
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                games.forEach { game ->
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                filteredGames.forEach { game ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(4.dp),
-
-                        colors = CardDefaults.cardColors(containerColor = Color.DarkGray)
+                            .clickable { onViewGame(game) },
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
+                        shape = MaterialTheme.shapes.medium
                     ) {
-                        Box(modifier = Modifier.fillMaxWidth()) { // ✅ Must use Box here
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onViewGame(game) }
-                                    .padding(8.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.DarkGray) // ✅ use this instead
-                            )  {
-                                Text(
-                                    text = game.title,
-                                    color = Color(0xFFFFA500),
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Text(
-                                    text = "Time: ${game.date} at ${game.time}",
-                                    color = Color(0xFFFFA500)
-                                    ,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                                if (game.notes.isNotBlank()) {
-                                    Text(
-                                        text = game.notes,
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.padding(top = 8.dp)
-                                    )
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("${game.sport}: ${game.title}", color = Color(0xFFFFA500), style = MaterialTheme.typography.titleMedium)
+                                Row {
+                                    IconButton(onClick = { onEdit(game) }) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
+                                    }
+                                    IconButton(onClick = { onDeleteGame(game) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+                                    }
                                 }
                             }
 
-                            // ✅ Top-right trash icon aligned inside Box
-                            IconButton(
-                                onClick = { onDeleteGame(game) },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd) // ✅ Only works inside Box
-                                    .padding(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete Game",
-                                    tint = Color.Red
-                                )
+                            val timeText = if (game.date.isBlank() || game.time.isBlank()) {
+                                "No time provided"
+                            } else {
+                                "${game.date} at ${game.time}"
                             }
+                            Text(timeText, color = Color(0xFFFFA500))
+
+                            val notesText = if (game.notes.isBlank()) {
+                                "No description provided"
+                            } else {
+                                game.notes
+                            }
+                            Text(notesText, color = Color.White)
                         }
                     }
                 }
             }
-
         }
     }
 }
-
-
-

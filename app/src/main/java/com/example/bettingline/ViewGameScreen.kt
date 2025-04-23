@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Share
@@ -30,12 +30,50 @@ fun ViewGameScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    var showEditScreen by remember { mutableStateOf(false) }
+    var currentGame by remember { mutableStateOf(game) }
     var isRunning by remember { mutableStateOf(false) }
 
-    val lineStates = remember {
-        game.bettingLines.associateWith { line ->
-            mutableStateOf(game.lineValues[line] ?: 0f)
-        }.toMutableMap()
+    // Static target values - frozen
+    val staticValues = remember(currentGame) {
+        currentGame.playerLines.associate { (it.player to it.lineName) to it.value }
+    }
+
+// Live (running) values, based on the last saved liveValue
+    val currentValues = remember(currentGame) {
+        mutableStateMapOf<Pair<String, String>, Float>().apply {
+            currentGame.playerLines.forEach {
+                this[it.player to it.lineName] = it.liveValue
+            }
+        }
+    }
+
+
+
+
+
+    if (showEditScreen) {
+        EditGameScreen(
+            originalGame = currentGame,
+            onSave = { updatedGame ->
+                val index = games.indexOfFirst {
+                    it.title == currentGame.title &&
+                            it.date == currentGame.date &&
+                            it.time == currentGame.time
+                }
+                if (index != -1) {
+                    games[index] = updatedGame
+                    scope.launch { GameStorage.saveGames(context, games) }
+                }
+                currentGame = updatedGame
+                showEditScreen = false
+            },
+            onCancel = {
+                showEditScreen = false
+            }
+        )
+        return
     }
 
     Column(
@@ -46,38 +84,29 @@ fun ViewGameScreen(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color(0xFFFFA500))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFFFFA500))
                 }
-                Text(game.title, style = MaterialTheme.typography.headlineLarge, color = Color.White)
+                Text(currentGame.title, style = MaterialTheme.typography.headlineLarge, color = Color.White)
             }
-
             Row {
-                IconButton(onClick = { onEdit(game) }) {
+                IconButton(onClick = { showEditScreen = true }) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color(0xFFFFA500))
                 }
                 IconButton(onClick = {
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
-                        putExtra(Intent.EXTRA_SUBJECT, "Betting Game: ${game.title}")
+                        putExtra(Intent.EXTRA_SUBJECT, "Betting Game: ${currentGame.title}")
                         putExtra(Intent.EXTRA_TEXT, buildString {
-                            append("Game: ${game.title}\n")
-                            append("Sport: ${game.sport}\n")
-                            append("Date: ${game.date} at ${game.time}\n")
-                            if (game.notes.isNotBlank()) append("Notes: ${game.notes}\n")
-                            if (lineStates.isNotEmpty()) {
-                                append("Betting Lines:\n")
-                                lineStates.forEach { (name, value) ->
-                                    append("- $name: ${value.value}\n")
-                                }
-                            }
+                            append("Game: ${currentGame.title}\n")
+                            append("Sport: ${currentGame.sport}\n")
+                            append("Date: ${currentGame.date} at ${currentGame.time}\n")
+                            if (currentGame.notes.isNotBlank()) append("Notes: ${currentGame.notes}\n")
                         })
                     }
                     context.startActivity(Intent.createChooser(shareIntent, "Share Game"))
@@ -89,62 +118,67 @@ fun ViewGameScreen(
 
         Divider(color = Color.DarkGray)
 
-        // Sport & Time
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                val sportIcon = when (game.sport.lowercase()) {
-                    "mma" -> "🥊"
-                    "basketball" -> "🏀"
-                    "football" -> "🏈"
-                    "soccer" -> "⚽️"
-                    "baseball" -> "⚾️"
-                    "hockey" -> "🏒"
-                    "tennis" -> "🎾"
-                    "golf" -> "⛳️"
-                    "custom" -> "🎮"
-                    else -> "🏅"
-                }
-
-                Text(
-                    text = "$sportIcon ${game.sport}",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge
-                )
+            val icon = when (currentGame.sport.lowercase()) {
+                "mma" -> "🥊"
+                "basketball" -> "🏀"
+                "football" -> "🏈"
+                "soccer" -> "⚽️"
+                "baseball" -> "⚾️"
+                "hockey" -> "🏒"
+                "tennis" -> "🎾"
+                "golf" -> "⛳️"
+                "custom" -> "🎮"
+                else -> "🏅"
             }
-
+            Text("$icon ${currentGame.sport}", color = Color.White, style = MaterialTheme.typography.titleLarge)
             Column(horizontalAlignment = Alignment.End) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row {
                     Icon(Icons.Default.CalendarToday, contentDescription = "Date", tint = Color(0xFFFFA500), modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(game.date, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    Text(currentGame.date, color = Color.White)
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row {
                     Icon(Icons.Default.AccessTime, contentDescription = "Time", tint = Color(0xFFFFA500), modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(game.time, color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                    Text(currentGame.time, color = Color.White)
                 }
             }
         }
 
-        // Run Game Button
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
             Button(
                 onClick = {
                     if (isRunning) {
-                        val updatedValues = lineStates.mapValues { it.value.value }
-                        val updatedGame = game.copy(lineValues = updatedValues)
-                        val index = games.indexOfFirst { it.title == game.title && it.date == game.date }
-                        if (index != -1) {
-                            games[index] = updatedGame
-                            scope.launch {
-                                GameStorage.saveGames(context, games)
+                        val updatedPlayerLines = buildList {
+                            currentGame.playerLines.forEach {
+                                val key = it.player to it.lineName
+                                val newLiveValue = currentValues[key] ?: it.liveValue
+                                add(it.copy(liveValue = newLiveValue))
                             }
                         }
+
+
+
+
+                        val updatedGame = currentGame.copy(playerLines = updatedPlayerLines)
+                        val index = games.indexOfFirst {
+                            it.title == currentGame.title &&
+                                    it.date == currentGame.date &&
+                                    it.time == currentGame.time
+                        }
+
+                        if (index != -1) {
+                            games[index] = updatedGame
+                            scope.launch { GameStorage.saveGames(context, games) }
+                        }
+                        currentGame = updatedGame
                     }
                     isRunning = !isRunning
                 },
@@ -155,8 +189,6 @@ fun ViewGameScreen(
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-
-        // Description
         Text("Description", color = Color(0xFFFFA500), style = MaterialTheme.typography.titleMedium)
         Box(
             modifier = Modifier
@@ -165,21 +197,19 @@ fun ViewGameScreen(
                 .padding(12.dp)
         ) {
             Text(
-                text = if (game.notes.isBlank()) "No notes provided." else game.notes,
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge
+                if (currentGame.notes.isBlank()) "No notes provided." else currentGame.notes,
+                color = Color.White
             )
         }
 
         Divider(color = Color.DarkGray)
 
-        // Betting Lines
-        if (lineStates.isNotEmpty()) {
+        if (currentGame.playerLines.isNotEmpty()) {
             Text("Lines", color = Color(0xFFFFA500), style = MaterialTheme.typography.titleLarge)
-
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                lineStates.forEach { (lineName, state) ->
-                    val lineValue = state.value
+                currentGame.playerLines.forEach { pl ->
+                    val key = pl.player to pl.lineName
+                    val current = currentValues[key] ?: pl.value
 
                     Row(
                         modifier = Modifier
@@ -189,27 +219,24 @@ fun ViewGameScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            lineName,
-                            color = Color(0xFFFFFFFF),
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(pl.player, color = Color.White, style = MaterialTheme.typography.titleSmall)
+                            Text(pl.lineName, color = Color(0xFFFFA500), style = MaterialTheme.typography.titleMedium)
+                            Text("Target: ${staticValues[key] ?: 0f}", color = Color.LightGray)
 
+                        }
                         if (isRunning) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
-                                    onClick = { state.value -= 1f },
+                                    onClick = { currentValues[key] = current - 1f },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
-                                ) { Text("–", color = Color.Black) }
-
+                                ) {
+                                    Text("–", color = Color.Black)
+                                }
                                 OutlinedTextField(
-                                    value = lineValue.toString(),
+                                    value = current.toString(),
                                     onValueChange = {
-                                        it.toFloatOrNull()?.let { newVal -> state.value = newVal }
+                                        it.toFloatOrNull()?.let { f -> currentValues[key] = f }
                                     },
                                     singleLine = true,
                                     modifier = Modifier.width(70.dp),
@@ -221,14 +248,15 @@ fun ViewGameScreen(
                                         cursorColor = Color.White
                                     )
                                 )
-
                                 Button(
-                                    onClick = { state.value += 1f },
+                                    onClick = { currentValues[key] = current + 1f },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
-                                ) { Text("+", color = Color.Black) }
+                                ) {
+                                    Text("+", color = Color.Black)
+                                }
                             }
                         } else {
-                            Text("Value: $lineValue", color = Color.LightGray, style = MaterialTheme.typography.bodyLarge)
+                            Text("Current: $current", color = Color.LightGray, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }
