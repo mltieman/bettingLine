@@ -8,6 +8,7 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
@@ -84,7 +85,7 @@ fun RaceScreen() {
 
     var showBetDialog by remember { mutableStateOf(false) }
     var currentSelectedHorse by remember { mutableStateOf<HorseWithState?>(null) }
-    val players = remember { mutableStateListOf<String>() }
+    var players = remember { mutableStateListOf<String>() }
     val bets = remember { mutableStateMapOf<Pair<String, String>, Int>() } // key: (player, horse), value: amount
     val totalBetsPerHorse = bets
         .entries
@@ -145,6 +146,9 @@ fun RaceScreen() {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text(
+            "Bet a winner", fontSize = 50.sp, color = Color.White
+        )
         // Race Track
         Box(
             modifier = Modifier
@@ -156,7 +160,8 @@ fun RaceScreen() {
             HorseRaceScreen(
                 horses = horses,
                 raceInProgress = raceInProgress,
-                onRaceEnd = {winner = it
+                onRaceEnd = { s ->
+                    winner = s
                     scope.launch {
                         delay(10000L) // Wait 3 seconds before resetting to start screen
                         raceInProgress = false
@@ -176,18 +181,20 @@ fun RaceScreen() {
 //                color = Color.White
 //            )
             val winnings = calculateOddsBasedWinnings(winner!!)
-            Text("🏆 Race Results")
-            Text("Winner: $winner")
+            Text("🏆 Race Results", color = Color.White)
+            Text("Winner: $winner", color = Color.White)
 
             winnings.forEach { (player, amount) ->
-                Text("$player won $$amount")
+                Text("$player won $$amount",color = Color.White)
             }
+            //players = null
         }
 
         // Event Log
         Column(
             modifier = Modifier
                 .weight(1f)
+                .padding(top = 20.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             eventLog.takeLast(5).forEach { event ->
@@ -281,7 +288,16 @@ fun RaceScreen() {
                         onClick = {
                             val horse = currentSelectedHorse
                             val amount = betAmount.toIntOrNull()
-                            if (horse != null && playerName.isNotBlank() && amount != null && amount > 0) {
+
+                            val minimumBet = 10
+
+                            if (amount!=null && amount < minimumBet) {
+                                // Show error message to user
+                                Toast.makeText(context, "Minimum bet is $$minimumBet", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            if (horse != null && playerName.isNotBlank() && amount != null) {
                                 players.add(playerName)
                                 bets[playerName to horse.name] = amount
                                 eventLog = eventLog + "$playerName bet $betAmount \uD83D\uDCB0 on ${currentSelectedHorse?.name}"
@@ -313,7 +329,7 @@ fun RaceScreen() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            if (winner == null) {
+            if (winner == null && horses.size >= 2 && players.size > 1) {
                 Button(
                     onClick = {
                         scope.launch {
@@ -466,7 +482,7 @@ fun HorseRaceScreen(
     }
 
     val centerX = screenWidthPx / 2f
-    val centerY = screenHeightPx / 2.5f
+    val centerY = screenHeightPx / 4f
     val xRadius = screenWidthPx / 3f
     val yRadius = screenHeightPx / 4f
 
