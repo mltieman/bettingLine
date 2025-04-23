@@ -54,7 +54,14 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.runtime.remember
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.room.Room
@@ -74,6 +81,39 @@ fun RaceScreen() {
     var raceInProgress by remember { mutableStateOf(false) }
     var winner by remember { mutableStateOf<String?>(null) }
     var eventLog by remember { mutableStateOf(listOf<String>()) }
+
+    var showBetDialog by remember { mutableStateOf(false) }
+    var currentSelectedHorse by remember { mutableStateOf<HorseWithState?>(null) }
+    val players = remember { mutableStateListOf<String>() }
+    val bets = remember { mutableStateMapOf<Pair<String, String>, Int>() } // key: (player, horse), value: amount
+    val totalBetsPerHorse = bets
+        .entries
+        .groupBy { it.key.second } // horseName
+        .mapValues { entry -> entry.value.sumOf { it.value } } // sum of amounts
+    val totalPool = bets.values.sum()
+    var playerName by remember { mutableStateOf("") }
+    var betAmount by remember { mutableStateOf("") }
+    //val winnings = remember { mutableStateMapOf<String, Int>()}
+
+    fun calculateOddsBasedWinnings(winningHorse: String): Map<String, Int> {
+        val winningHorseTotal = totalBetsPerHorse[winningHorse] ?: 0
+
+        if (winningHorseTotal == 0) return emptyMap() // No one bet on winner
+
+        val result = mutableMapOf<String, Int>()
+
+        bets.forEach { (playerHorsePair, amount) ->
+            val (playerNamed, horseName) = playerHorsePair
+
+            if (horseName == winningHorse) {
+                val playerShare = amount.toDouble() / winningHorseTotal
+                val payout = (playerShare * totalPool).toInt()
+                result[playerNamed] = payout
+            }
+        }
+
+        return result
+    }
 
     val dao = remember {
         HorseDatabase.getDatabase(context).horseDao()
@@ -116,17 +156,32 @@ fun RaceScreen() {
             HorseRaceScreen(
                 horses = horses,
                 raceInProgress = raceInProgress,
-                onRaceEnd = { winner = it },
+                onRaceEnd = {winner = it
+                    scope.launch {
+                        delay(10000L) // Wait 3 seconds before resetting to start screen
+                        raceInProgress = false
+                        winner = null
+                        eventLog = emptyList()
+                        horses.forEach { it.progress.floatValue = 0f }
+                    } },
                 onEvent = { event -> eventLog = eventLog + event }
             )
         }
 
         winner?.let {
-            Text(
-                text = "🏆 Winner: $it!",
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color.White
-            )
+            //eventLog = listOfNotNull()
+//            Text(
+//                text = "🏆 Winner: $it!",
+//                style = MaterialTheme.typography.headlineMedium,
+//                color = Color.White
+//            )
+            val winnings = calculateOddsBasedWinnings(winner!!)
+            Text("🏆 Race Results")
+            Text("Winner: $winner")
+
+            winnings.forEach { (player, amount) ->
+                Text("$player won $$amount")
+            }
         }
 
         // Event Log
@@ -158,8 +213,18 @@ fun RaceScreen() {
                         contentDescription = horse.name,
                         modifier = Modifier
                             .size(50.dp)
-                            .background(Color.White),
+                            .background(Color.White)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = rememberRipple()
+                            ) {
+                                if (!raceInProgress) {
+                                    currentSelectedHorse = horse
+                                    showBetDialog = true
+                                }
+                            },
                         colorFilter = ColorFilter.tint(horse.color)
+
                     )
                     Text(
                         text = horse.name,
@@ -185,36 +250,95 @@ fun RaceScreen() {
                 }
             }
         }
-
+        if (showBetDialog && currentSelectedHorse != null) {
+            AlertDialog(
+                onDismissRequest = {
+                    showBetDialog = false
+                    playerName = ""
+                    betAmount = ""
+                },
+                title = {
+                    Text("Place Bet on ${currentSelectedHorse?.name}")
+                },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = playerName,
+                            onValueChange = { playerName = it },
+                            label = { Text("Player Name") }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = betAmount,
+                            onValueChange = { betAmount = it },
+                            label = { Text("Bet Amount") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val horse = currentSelectedHorse
+                            val amount = betAmount.toIntOrNull()
+                            if (horse != null && playerName.isNotBlank() && amount != null && amount > 0) {
+                                players.add(playerName)
+                                bets[playerName to horse.name] = amount
+                                eventLog = eventLog + "$playerName bet $betAmount \uD83D\uDCB0 on ${currentSelectedHorse?.name}"
+                                showBetDialog = false
+                                playerName = ""
+                                betAmount = ""
+                            }
+                            //eventLog = eventLog + "$playerName bet $betAmount \uD83D\uDCB0 on ${currentSelectedHorse?.name}"
+                        }
+                    ) {
+                        Text("Confirm")
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = {
+                            showBetDialog = false
+                            playerName = ""
+                            betAmount = ""
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
         // Buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Button(
-                onClick = {
-                    scope.launch {
-                        // Always stop race first
-                        raceInProgress = false
-                        delay(100) // Let the UI reset
+            if (winner == null) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            // Always stop race first
+                            raceInProgress = false
+                            delay(100) // Let the UI reset
 
-                        // Reset game state
-                        winner = null
-                        eventLog = emptyList()
-                        horses.forEach { it.progress.floatValue = 0f }
+                            // Reset game state
+                            winner = null
+                            eventLog = emptyList()
+                            horses.forEach { it.progress.floatValue = 0f }
 
-                        // Then start race again
-                        raceInProgress = true
+                            // Then start race again
+                            raceInProgress = true
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
+                ) {
+                    if (raceInProgress) {
+                        Text("Restart Race", color = Color.White)
+                    } else {
+                        Text("Start Race", color = Color.White)
+
                     }
-                },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
-            ) {
-                if (raceInProgress ) {
-                    Text("Restart Race", color = Color.White)
-                } else {
-                    Text("Start Race", color = Color.White)
-
                 }
             }
 
@@ -254,6 +378,7 @@ fun generateRandomHorse(): Horse {
         colorHex = randomHexColor()
     )
 }
+
 
 @Composable
 fun HorseListPopupButton(horses: List<HorseWithState>) {
