@@ -1,5 +1,7 @@
 package com.example.bettingline
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -12,30 +14,32 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.bettingline.GameData.Game
+import com.example.bettingline.GameData.PlayerLine
+import java.util.*
 
 @Composable
-fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (GameData.Game) -> Unit) {
+fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (Game) -> Unit) {
+    val context = LocalContext.current
+    val calendar = Calendar.getInstance()
+
     var title by remember { mutableStateOf("") }
     var sport by remember { mutableStateOf(selectedSport) }
     var date by remember { mutableStateOf("") }
     var time by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
-    val bettingLines = remember { mutableStateListOf<String>() }
-    var newLineName by remember { mutableStateOf("") }
-    var newLineValue by remember { mutableStateOf("") }
 
-    val sports = listOf(
-        "Custom" to "🎮",
-        "MMA" to "🥊",
-        "Basketball" to "🏀",
-        "Football" to "🏈",
-        "Soccer" to "⚽️",
-        "Baseball" to "⚾️",
-        "Hockey" to "🏒",
-        "Tennis" to "🎾",
-        "Golf" to "⛳️"
-    )
+    var newPlayer by remember { mutableStateOf("") }
+    val players = remember { mutableStateListOf<String>() }
+
+    var newLineName by remember { mutableStateOf("") }
+    val globalLines = remember { mutableStateListOf<String>() }
+
+    val staticPlayerLines = remember { mutableStateListOf<PlayerLine>() }
+    val staticValues = remember { mutableMapOf<String, Float>() }
+    val valueInputs = remember { mutableStateMapOf<Pair<String, String>, String>() }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = Color(0xFFFFA500),
@@ -45,6 +49,31 @@ fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (GameData.
         unfocusedLabelColor = Color.LightGray,
         focusedTextColor = Color.White,
         unfocusedTextColor = Color.White
+    )
+
+    val sports = listOf(
+        "Custom" to "🎮", "MMA" to "🥊", "Basketball" to "🏀", "Football" to "🏈",
+        "Soccer" to "⚽️", "Baseball" to "⚾️", "Hockey" to "🏒", "Tennis" to "🎾", "Golf" to "⛳️"
+    )
+
+    val datePickerDialog = DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            date = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth)
+        },
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH)
+    )
+
+    val timePickerDialog = TimePickerDialog(
+        context,
+        { _, hour, minute ->
+            time = String.format("%02d:%02d", hour, minute)
+        },
+        calendar.get(Calendar.HOUR_OF_DAY),
+        calendar.get(Calendar.MINUTE),
+        true
     )
 
     Column(
@@ -57,99 +86,107 @@ fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (GameData.
         Text("Create Game", style = MaterialTheme.typography.headlineMedium, color = Color.White)
 
         OutlinedTextField(
-            value = title,
-            onValueChange = { title = it },
-            label = { Text("Game Title") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = fieldColors
+            value = title, onValueChange = { title = it },
+            label = { Text("Game Title") }, modifier = Modifier.fillMaxWidth(), colors = fieldColors
         )
 
         Text("Select Sport", color = Color.White)
         Row(
-            modifier = Modifier
-                .horizontalScroll(rememberScrollState()),
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             sports.forEach { (name, icon) ->
-                val isSelected = name == sport
                 Button(
                     onClick = { sport = name },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isSelected) Color(0xFFFFA500) else Color.DarkGray
+                        containerColor = if (name == sport) Color(0xFFFFA500) else Color.DarkGray
                     ),
-                    shape = MaterialTheme.shapes.large,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Text("$icon $name", color = Color.White)
-                }
+                    shape = MaterialTheme.shapes.large
+                ) { Text("$icon $name", color = Color.White) }
             }
         }
 
-        OutlinedTextField(
-            value = date,
-            onValueChange = { date = it },
-            label = { Text("Date (e.g., 2024-04-10)") },
+        Button(
+            onClick = { datePickerDialog.show() },
             modifier = Modifier.fillMaxWidth(),
-            colors = fieldColors
-        )
+            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+        ) {
+            Text(if (date.isBlank()) "Select Date" else "Date: $date", color = Color.White)
+        }
+
+        Button(
+            onClick = { timePickerDialog.show() },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+        ) {
+            Text(if (time.isBlank()) "Select Time" else "Time: $time", color = Color.White)
+        }
 
         OutlinedTextField(
-            value = time,
-            onValueChange = { time = it },
-            label = { Text("Time (e.g., 7:30 PM)") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = fieldColors
-        )
-
-        OutlinedTextField(
-            value = notes,
-            onValueChange = { notes = it },
-            label = { Text("Notes (optional)") },
-            modifier = Modifier.fillMaxWidth(),
-            maxLines = 3,
-            colors = fieldColors
+            value = notes, onValueChange = { notes = it },
+            label = { Text("Notes") }, maxLines = 3, modifier = Modifier.fillMaxWidth(), colors = fieldColors
         )
 
         Divider(color = Color.Gray)
 
-        Text("Add a New Betting Line", color = Color.White, style = MaterialTheme.typography.titleMedium)
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Text("Add Players", style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
-                value = newLineName,
-                onValueChange = { newLineName = it },
-                label = { Text("Line Name") },
-                modifier = Modifier.weight(1f),
-                colors = fieldColors,
-                singleLine = true
-
+                value = newPlayer, onValueChange = { newPlayer = it },
+                label = { Text("Player Name") }, modifier = Modifier.weight(1f), colors = fieldColors
             )
-
-            OutlinedTextField(
-                value = newLineValue,
-                onValueChange = { newLineValue = it },
-                label = { Text("Value") },
-                modifier = Modifier.width(100.dp),
-                colors = fieldColors,
-                singleLine = true
-            )
-
+            Spacer(Modifier.width(8.dp))
             Button(
                 onClick = {
-                    val value = newLineValue.toFloatOrNull()
-                    if (newLineName.isNotBlank() && value != null) {
-                        bettingLines.add("${newLineName.trim()}: ${"%.2f".format(value)}")
-                        newLineName = ""
-                        newLineValue = ""
+                    if (newPlayer.isNotBlank()) {
+                        players.add(newPlayer.trim())
+                        newPlayer = ""
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
-            ) {
-                Text("Add", color = Color.White)
+            ) { Text("Add", color = Color.White) }
+        }
+
+        if (players.isNotEmpty()) {
+            Text("Add Lines", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = newLineName, onValueChange = { newLineName = it },
+                    label = { Text("Line Name") }, modifier = Modifier.weight(1f), colors = fieldColors
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        if (newLineName.isNotBlank()) {
+                            globalLines.add(newLineName.trim())
+                            newLineName = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
+                ) { Text("Add", color = Color.White) }
+            }
+        }
+
+        if (players.isNotEmpty() && globalLines.isNotEmpty()) {
+            Text("Assign Line Values", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            players.forEach { player ->
+                Text(player, style = MaterialTheme.typography.titleSmall, color = Color(0xFFFFA500))
+                globalLines.forEach { line ->
+                    val key = player to line
+                    val inputValue = valueInputs[key] ?: ""
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(line, color = Color.LightGray, modifier = Modifier.weight(1f))
+                        OutlinedTextField(
+                            value = inputValue,
+                            onValueChange = { valueInputs[key] = it },
+                            modifier = Modifier.width(100.dp),
+                            label = { Text("Value") },
+                            colors = fieldColors,
+                            singleLine = true
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
             }
         }
 
@@ -157,13 +194,19 @@ fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (GameData.
 
         Button(
             onClick = {
-                val game = GameData.Game(
+                val validatedLines = valueInputs.mapNotNull { (key, value) ->
+                    val (player, line) = key
+                    value.toFloatOrNull()?.let { PlayerLine(player, line, it) }
+                }
+                val game = Game(
                     title = title,
                     sport = sport,
                     date = date,
                     time = time,
                     notes = notes,
-                    bettingLines = bettingLines.toList()
+                    players = players.toList(),
+                    bettingLines = globalLines.toList(),
+                    playerLines = validatedLines
                 )
                 onGameCreated(game)
             },
