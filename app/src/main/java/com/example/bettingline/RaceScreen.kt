@@ -172,7 +172,6 @@ fun RaceScreen() {
                 onEvent = { event -> eventLog = eventLog + event }
             )
         }
-
         winner?.let {
             //eventLog = listOfNotNull()
 //            Text(
