@@ -1,16 +1,7 @@
 package com.example.bettingline
 
-import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
-import android.graphics.drawable.BitmapDrawable
-import android.os.Bundle
+
 import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -25,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -35,43 +25,20 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.BlendMode
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.runtime.remember
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.room.Room
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.math.cos
-import kotlin.math.sin
 
 @Composable
 fun RaceScreen() {
@@ -146,9 +113,11 @@ fun RaceScreen() {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            "Bet a winner", fontSize = 50.sp, color = Color.White
-        )
+        if (!raceInProgress && winner == null) {
+            Text(
+                "Bet a winner", fontSize = 50.sp, color = Color.White
+            )
+        }
         // Race Track
         Box(
             modifier = Modifier
@@ -172,7 +141,6 @@ fun RaceScreen() {
                 onEvent = { event -> eventLog = eventLog + event }
             )
         }
-
         winner?.let {
             //eventLog = listOfNotNull()
 //            Text(
