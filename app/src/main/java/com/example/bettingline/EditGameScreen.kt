@@ -1,7 +1,10 @@
 package com.example.bettingline
 
+import android.app.AlarmManager
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,8 +17,9 @@ import androidx.compose.ui.unit.dp
 import com.example.bettingline.GameData.Game
 import com.example.bettingline.GameData.PlayerLine
 import java.util.Calendar
-import java.util.*
 import androidx.compose.ui.platform.LocalContext
+import android.app.PendingIntent
+
 
 @Composable
 fun EditGameScreen(
@@ -274,6 +278,11 @@ fun EditGameScreen(
         // --- SAVE button: save and navigate back to home ---
         Button(
             onClick = {
+
+                //cancel old reminders
+                val origMs = parseGameDateTime("${originalGame.date} ${originalGame.time}")
+                cancelNotification(context, origMs - 24L*60*60*1000)
+                cancelNotification(context, origMs - 30L*60*1000)
                 // build updated playerLines in the same order as UI
                 val updatedPL = mutableListOf<PlayerLine>()
                 players.forEach { p ->
@@ -299,6 +308,13 @@ fun EditGameScreen(
                     bettingLines = globalLines.toList(),
                     playerLines = updatedPL
                 )
+                val now = System.currentTimeMillis()
+                val updMs = parseGameDateTime("$date $time")
+                val oneDay = updMs - 24L*60*60*1000
+                val thirtyM = updMs - 30L*60*1000
+                if (oneDay>now)    scheduleNotification(context, oneDay,    "Game Tomorrow!", "Don't forget: ${updatedGame.title}")
+                if (thirtyM>now)   scheduleNotification(context, thirtyM,   "Game Soon!",     "Get ready: ${updatedGame.title} starts soon!")
+
                 onSave(updatedGame)
                 onCancel()
             },
@@ -316,4 +332,17 @@ fun EditGameScreen(
             Text("Cancel")
         }
     }
+}
+
+// Cancels an alarm previously set with scheduleNotification
+fun cancelNotification(context: Context, triggerTimeMillis: Long) {
+    val intent = Intent(context, GameReminderReceiver::class.java)
+    val pi = PendingIntent.getBroadcast(
+        context,
+        (triggerTimeMillis % Int.MAX_VALUE).toInt(),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    am.cancel(pi)
 }

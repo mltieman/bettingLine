@@ -106,13 +106,34 @@ fun ViewGameScreen(
                             append("Game: ${currentGame.title}\n")
                             append("Sport: ${currentGame.sport}\n")
                             append("Date: ${currentGame.date} at ${currentGame.time}\n")
-                            if (currentGame.notes.isNotBlank()) append("Notes: ${currentGame.notes}\n")
+                            if (currentGame.notes.isNotBlank()) {
+                                append("Notes: ${currentGame.notes}\n\n")
+                            }
+
+                            append("Players and Lines:\n")
+                            val players = currentGame.players.distinct()
+                            val lines = currentGame.bettingLines.distinct()
+
+                            players.forEach { player ->
+                                append("- $player:\n")
+                                lines.forEach { line ->
+                                    val key = player to line
+                                    val targetValue = currentGame.playerLines
+                                        .find { it.player == player && it.lineName == line }
+                                        ?.value ?: 0f
+                                    val runningValue = currentValues[key] ?: 0f
+
+                                    append("   • $line: Target = $targetValue, Current = $runningValue\n")
+                                }
+                                append("\n")
+                            }
                         })
                     }
-                    context.startActivity(Intent.createChooser(shareIntent, "Share Game"))
+                    context.startActivity(Intent.createChooser(shareIntent, "Share Game Info"))
                 }) {
                     Icon(Icons.Default.Share, contentDescription = "Share", tint = Color(0xFFFFA500))
                 }
+
             }
         }
 
