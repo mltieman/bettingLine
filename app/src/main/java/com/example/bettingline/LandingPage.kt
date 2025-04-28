@@ -39,7 +39,7 @@ fun LandingPage() {
         topBar = {
             if (currentScreen != "viewGame" && currentScreen != "editGame"&& currentScreen != "settings" && currentScreen != "about" && currentScreen != "legal" && currentScreen != "contact") {
                 TopAppBar(
-                    title = { Text("Betting App", color = Color.White) },
+                    title = { Text("Betting Line", color = Color.White) },
                     navigationIcon = {
                         IconButton(onClick = { expanded = true }) {
                             Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color(0xFFFFA500))
