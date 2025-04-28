@@ -1,7 +1,12 @@
 package com.example.bettingline
 
+import android.app.AlarmManager
 import android.app.DatePickerDialog
+import android.app.PendingIntent
 import android.app.TimePickerDialog
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -15,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import java.text.SimpleDateFormat
+import java.util.Locale
 import androidx.compose.ui.unit.dp
 import com.example.bettingline.GameData.Game
 import com.example.bettingline.GameData.PlayerLine
@@ -75,6 +82,18 @@ fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (Game) -> 
         calendar.get(Calendar.MINUTE),
         true
     )
+
+    fun sportEmoji(sport: String) = when(sport) {
+        "MMA"        -> "🥊"
+        "Basketball" -> "🏀"
+        "Football"   -> "🏈"
+        "Soccer"     -> "⚽️"
+        "Baseball"   -> "⚾️"
+        "Hockey"     -> "🏒"
+        "Tennis"     -> "🎾"
+        "Golf"       -> "⛳️"
+        else         -> "🎮"
+    }
 
     Column(
         modifier = Modifier
@@ -208,6 +227,33 @@ fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (Game) -> 
                     bettingLines = globalLines.toList(),
                     playerLines = validatedLines
                 )
+                val emoji = sportEmoji(game.sport)
+
+                val dateTimeString = "$date $time"
+                val gameDateTime   = parseGameDateTime(dateTimeString)
+                val now            = System.currentTimeMillis()
+
+                val oneDayBefore   = gameDateTime - 24L*60*60*1000
+                val thirtyMinBefore= gameDateTime - 30L*60*1000
+
+                // only schedule if still in the future
+                if (oneDayBefore > now) {
+                    scheduleNotification(
+                        context,
+                        oneDayBefore,
+                        "$emoji Game Tomorrow!",
+                        "Don't forget: $emoji ${game.title}"
+                    )
+                }
+                if (thirtyMinBefore > now) {
+                    scheduleNotification(
+                        context,
+                        thirtyMinBefore,
+                        "$emoji Game Soon!",
+                        "Get ready for $emoji ${game.title}"
+                    )
+                }
+
                 onGameCreated(game)
             },
             modifier = Modifier.fillMaxWidth(),
@@ -215,5 +261,59 @@ fun CreateGameScreen(selectedSport: String = "Custom", onGameCreated: (Game) -> 
         ) {
             Text("Create Game", color = Color.White)
         }
+    }
+}
+
+fun scheduleNotification(
+    context: Context,
+    triggerTimeMillis: Long,
+    title: String,
+    message: String
+) {
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (!alarmManager.canScheduleExactAlarms()) {
+            alarmManager.set(
+                AlarmManager.RTC_WAKEUP,
+                triggerTimeMillis,
+                PendingIntent.getBroadcast(
+                    context,
+                    (triggerTimeMillis % Int.MAX_VALUE).toInt(),
+                    Intent(context, GameReminderReceiver::class.java).apply {
+                        putExtra("title", title)
+                        putExtra("message", message)
+                    },
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+            return
+        }
+    }
+
+    val pi = PendingIntent.getBroadcast(
+        context,
+        (triggerTimeMillis % Int.MAX_VALUE).toInt(),
+        Intent(context, GameReminderReceiver::class.java).apply {
+            putExtra("title", title)
+            putExtra("message", message)
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    try {
+        alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pi)
+    } catch (sec: SecurityException) {
+        alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTimeMillis, pi)
+    }
+}
+
+
+fun parseGameDateTime(dateTimeString: String): Long {
+    val format = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+    return try {
+        format.parse(dateTimeString)?.time ?: System.currentTimeMillis()
+    } catch (e: Exception) {
+        System.currentTimeMillis()
     }
 }
