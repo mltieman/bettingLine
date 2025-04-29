@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.input.KeyboardType
@@ -51,16 +52,28 @@ fun RaceScreen() {
     var eventLog by remember { mutableStateOf(listOf<String>()) }
 
     var showBetDialog by remember { mutableStateOf(false) }
+    var showBetsPopup by remember { mutableStateOf(false) }
     var currentSelectedHorse by remember { mutableStateOf<HorseWithState?>(null) }
-    var players = remember { mutableStateListOf<String>() }
+    val players = remember { mutableStateListOf<String>() }
     val bets = remember { mutableStateMapOf<Pair<String, String>, Int>() } // key: (player, horse), value: amount
-    val totalBetsPerHorse = bets
+    var totalBetsPerHorse = bets
         .entries
         .groupBy { it.key.second } // horseName
         .mapValues { entry -> entry.value.sumOf { it.value } } // sum of amounts
     val totalPool = bets.values.sum()
     var playerName by remember { mutableStateOf("") }
     var betAmount by remember { mutableStateOf("") }
+
+    fun resetBettingState() {
+        showBetDialog = false
+        currentSelectedHorse = null
+        totalBetsPerHorse = emptyMap()
+        players.clear()
+        bets.clear()
+        playerName = ""
+        betAmount = ""
+        eventLog = emptyList()
+    }
     //val winnings = remember { mutableStateMapOf<String, Int>()}
 
     fun calculateOddsBasedWinnings(winningHorse: String): Map<String, Int> {
@@ -113,6 +126,19 @@ fun RaceScreen() {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Button(
+                onClick = { showBetsPopup = true },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4682B4))
+            ) {
+                Text("Show Bets", color = Color.White)
+            }
+        }
         if (!raceInProgress && winner == null) {
             Text(
                 "Bet a winner", fontSize = 50.sp, color = Color.White
@@ -137,6 +163,7 @@ fun RaceScreen() {
                         winner = null
                         eventLog = emptyList()
                         horses.forEach { it.progress.floatValue = 0f }
+                        resetBettingState()
                     } },
                 onEvent = { event -> eventLog = eventLog + event }
             )
@@ -162,7 +189,7 @@ fun RaceScreen() {
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(top = 20.dp)
+                //.padding(top = 2.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             eventLog.takeLast(5).forEach { event ->
@@ -173,6 +200,7 @@ fun RaceScreen() {
                 )
             }
         }
+
 
         // Horse list display with delete button
         Row(
@@ -212,11 +240,12 @@ fun RaceScreen() {
                                 scope.launch {
                                     dao.deleteById(horse.id) // Use the ID from HorseWithState
                                     horses.remove(horse) // Remove from UI list
+                                    resetBettingState()
                                 }
                             }
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Archive,
+                                imageVector = Icons.Outlined.Cancel,
                                 contentDescription = "Delete Horse",
                                 tint = Color.Red
                             )
@@ -266,6 +295,10 @@ fun RaceScreen() {
                             }
 
                             if (horse != null && playerName.isNotBlank() && amount != null) {
+                                if (players.contains(playerName)) {
+                                    Toast.makeText(context, "Player name already used. Choose a different name.", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
                                 players.add(playerName)
                                 bets[playerName to horse.name] = amount
                                 eventLog = eventLog + "$playerName bet $betAmount \uD83D\uDCB0 on ${currentSelectedHorse?.name}"
@@ -297,12 +330,12 @@ fun RaceScreen() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            if (winner == null && horses.size >= 2 && players.size > 1) {
+            if (winner == null && horses.size >= 2) {
                 Button(
                     onClick = {
                         scope.launch {
                             // Always stop race first
-                            raceInProgress = false
+                            raceInProgress = !raceInProgress
                             delay(100) // Let the UI reset
 
                             // Reset game state
@@ -311,14 +344,14 @@ fun RaceScreen() {
                             horses.forEach { it.progress.floatValue = 0f }
 
                             // Then start race again
-                            raceInProgress = true
+                            //raceInProgress = true
                         }
                     },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA500))
                 ) {
                     if (raceInProgress) {
-                        Text("Restart Race", color = Color.White)
+                        Text("End Race", color = Color.White)
                     } else {
                         Text("Start Race", color = Color.White)
 
@@ -334,6 +367,7 @@ fun RaceScreen() {
                         scope.launch {
                             val newHorse = generateRandomHorse()
                             dao.insertHorse(newHorse)
+                            resetBettingState()
                         }
                     },
                     modifier = Modifier.weight(1f),
@@ -344,6 +378,56 @@ fun RaceScreen() {
             }
         }
         if (!raceInProgress) {HorseListPopupButton(horses = horses)}
+        if (showBetsPopup) {
+            AlertDialog(
+                onDismissRequest = { showBetsPopup = false },
+                title = {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Current Bets", style = MaterialTheme.typography.titleLarge)
+                    }
+                },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Total Pool: $$totalPool", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (bets.isEmpty()) {
+                            Text("No bets placed yet.")
+                        } else {
+                            // Header row
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Player", modifier = Modifier.weight(1f))
+                                Text("Bet", modifier = Modifier.weight(1f))
+                                Text("Horse", modifier = Modifier.weight(1f))
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            bets.forEach { (playerHorsePair, amount) ->
+                                val (player, horse) = playerHorsePair
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(player, modifier = Modifier.weight(1f))
+                                    Text("$$amount", modifier = Modifier.weight(1f))
+                                    Text(horse, modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { showBetsPopup = false }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
     }
 }
 fun randomHexColor(): String {
@@ -373,7 +457,7 @@ fun HorseListPopupButton(horses: List<HorseWithState>) {
         onClick = { showHorseListDialog = true },
         modifier = Modifier.padding(16.dp)
     ) {
-        Text("Show Horse List")
+        Text("Horse Stats")
     }
 
     // Horse list dialog
@@ -412,8 +496,8 @@ fun HorseListDialog(horses: List<HorseWithState>, onDismiss: () -> Unit) {
             Column {
                 horseProbabilities.forEach { (horse, probability) ->
                     Text(
-                        text = "Name: ${horse.name}, Speed: ${horse.speed}, Stamina: ${horse.stamina}, Probability: ${(probability * 100).toInt()}%",
-                        modifier = Modifier.padding(4.dp)
+                        text = "Name: ${horse.name}, Speed: ${"%.3f".format(horse.speed)}, Stamina: ${"%.3f".format(horse.stamina)}, Probability: ${(probability * 100).toInt()}%",
+                                modifier = Modifier.padding(4.dp)
                     )
                 }
             }
