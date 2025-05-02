@@ -39,6 +39,8 @@ import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 
 @Composable
@@ -150,8 +152,10 @@ fun RaceScreen() {
                 .fillMaxWidth()
                 .weight(0.6f) // Adjust the weight for more vertical space
                 .offset(x = (-20).dp) // Shift the track slightly to the left
+                .offset(y = (40).dp)
                 .align(Alignment.CenterHorizontally) // Center it horizontally
         ) {
+
             HorseRaceScreen(
                 horses = horses,
                 raceInProgress = raceInProgress,
@@ -167,6 +171,23 @@ fun RaceScreen() {
                     } },
                 onEvent = { event -> eventLog = eventLog + event }
             )
+//            Column(
+//                horizontalAlignment = Alignment.CenterHorizontally,
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(top = 2.dp)
+//                    .verticalScroll(rememberScrollState())
+//                    .offset(x = (20).dp)
+//
+//            ) {
+//                eventLog.takeLast(5).forEach { event ->
+//                    Text(
+//                        text = event,
+//                        modifier = Modifier.padding(4.dp),
+//                        color = Color.White
+//                    )
+//                }
+//            }
         }
         winner?.let {
             //eventLog = listOfNotNull()
@@ -176,8 +197,17 @@ fun RaceScreen() {
 //                color = Color.White
 //            )
             val winnings = calculateOddsBasedWinnings(winner!!)
-            Text("🏆 Race Results", color = Color.White)
-            Text("Winner: $winner", color = Color.White)
+            Text(
+                text = "🏆 Race Results",
+                color = Color.White,
+                fontSize = 24.sp
+            )
+
+            Text(
+                text = "Winner: $winner",
+                color = Color.White,
+                fontSize = 20.sp
+            )
 
             winnings.forEach { (player, amount) ->
                 Text("$player won $$amount",color = Color.White)
@@ -186,21 +216,23 @@ fun RaceScreen() {
         }
 
         // Event Log
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                //.padding(top = 2.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            eventLog.takeLast(5).forEach { event ->
-                Text(
-                    text = event,
-                    modifier = Modifier.padding(4.dp),
-                    color = Color.White
-                )
+        if (winner == null) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(top = 2.dp)
+                    .verticalScroll(rememberScrollState())
+                //.offset(y = (40).dp)
+            ) {
+                eventLog.takeLast(5).forEach { event ->
+                    Text(
+                        text = event,
+                        modifier = Modifier.padding(4.dp),
+                        color = Color.White
+                    )
+                }
             }
         }
-
 
         // Horse list display with delete button
         Row(
@@ -227,19 +259,22 @@ fun RaceScreen() {
                                 }
                             },
                         colorFilter = ColorFilter.tint(horse.color)
-
                     )
                     Text(
                         text = horse.name,
                         color = horse.color,
-                        style = MaterialTheme.typography.bodyLarge
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.width(50.dp), // Limit width to image size
+                        textAlign = TextAlign.Center
                     )
                     if (!raceInProgress) {
                         IconButton(
                             onClick = {
                                 scope.launch {
-                                    dao.deleteById(horse.id) // Use the ID from HorseWithState
-                                    horses.remove(horse) // Remove from UI list
+                                    dao.deleteById(horse.id)
+                                    horses.remove(horse)
                                     resetBettingState()
                                 }
                             }
@@ -301,7 +336,7 @@ fun RaceScreen() {
                                 }
                                 players.add(playerName)
                                 bets[playerName to horse.name] = amount
-                                eventLog = eventLog + "$playerName bet $betAmount \uD83D\uDCB0 on ${currentSelectedHorse?.name}"
+                               // eventLog = eventLog + "$playerName bet $betAmount \uD83D\uDCB0 on ${currentSelectedHorse?.name}"
                                 showBetDialog = false
                                 playerName = ""
                                 betAmount = ""
@@ -528,6 +563,7 @@ fun HorseRaceScreen(
     val screenWidthPx: Float
     val screenHeightPx: Float
 
+
     with(density) {
         screenWidthPx = configuration.screenWidthDp.dp.toPx()
         screenHeightPx = configuration.screenHeightDp.dp.toPx()
@@ -541,6 +577,7 @@ fun HorseRaceScreen(
     Box(modifier = Modifier.fillMaxSize()) {
 
         // Draw the oval track
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             val hexColor = Color(0xFFA52A2A)
             drawOval(
@@ -553,6 +590,15 @@ fun HorseRaceScreen(
                 color = Color(0xFF006400),
                 topLeft = Offset(centerX - xRadius + trackPadding, centerY - yRadius + trackPadding),
                 size = Size((xRadius - trackPadding) * 2, (yRadius - trackPadding) * 2)
+            )
+            val rightX = centerX + xRadius - 25f // near the right edge
+            val lineLength = 20.dp.toPx()
+
+            drawLine(
+                color = Color.White,
+                start = Offset(rightX - lineLength / 2, centerY), // center horizontally at right edge
+                end = Offset(rightX + lineLength / 2, centerY),
+                strokeWidth = 4.dp.toPx()
             )
         }
 
@@ -628,6 +674,18 @@ fun HorseRaceScreen(
                 }
             }
             delay(50L)
+        }
+    }
+    LaunchedEffect(raceInProgress) {
+        if (!raceInProgress) {
+            animatables.forEach { animatable ->
+                launch {
+                    animatable.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 600)
+                    )
+                }
+            }
         }
     }
 }
